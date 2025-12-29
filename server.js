@@ -49,19 +49,28 @@ app.get('/api/playlist', async (req, res) => {
 
     // Priority 1: Base64 encoded playlist
     if (M3U_BASE64) {
+      console.log('[Playlist] Loading from Base64 env var');
       content = Buffer.from(M3U_BASE64, 'base64').toString('utf-8');
     }
     // Priority 2: External URL
     else if (M3U_URL) {
+      console.log('[Playlist] Loading from URL:', M3U_URL);
       content = await fetchUrl(M3U_URL);
     }
-    // Priority 3: Local file (development only)
+    // Priority 3: Local file in data folder (private, for production)
     else {
-      const localPath = path.join(__dirname, 'public', 'canais.m3u');
-      if (fs.existsSync(localPath)) {
-        content = fs.readFileSync(localPath, 'utf-8');
+      const dataPath = path.join(__dirname, 'data', 'playlist.m3u');
+      const publicPath = path.join(__dirname, 'public', 'canais.m3u');
+      
+      if (fs.existsSync(dataPath)) {
+        console.log('[Playlist] Loading from data/playlist.m3u');
+        content = fs.readFileSync(dataPath, 'utf-8');
+      } else if (fs.existsSync(publicPath)) {
+        console.log('[Playlist] Loading from public/canais.m3u (dev fallback)');
+        content = fs.readFileSync(publicPath, 'utf-8');
       } else {
-        return res.status(404).json({ error: 'Playlist not configured. Set M3U_URL or M3U_BASE64 env var.' });
+        console.error('[Playlist] No playlist file found!');
+        return res.status(404).json({ error: 'Playlist not configured. Set M3U_URL, M3U_BASE64, or add data/playlist.m3u' });
       }
     }
 
