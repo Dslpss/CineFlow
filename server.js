@@ -1,0 +1,161 @@
+import express from 'express';
+import http from 'node:http';
+import https from 'node:https';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'node:fs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// IPTV Server config from environment (keeps credentials private)
+const IPTV_HOST = process.env.IPTV_HOST || 'tiralit.shop';
+const IPTV_PORT = parseInt(process.env.IPTV_PORT || '8880');
+
+// M3U Playlist source (URL or Base64)
+const M3U_URL = process.env.M3U_URL || '';
+const M3U_BASE64 = process.env.M3U_BASE64 || '';
+
+// Cache for playlist
+let playlistCache = null;
+let playlistCacheTime = 0;
+const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+
+// CORS headers for all responses
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Range');
+  
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+// API: Serve playlist from environment variable
+app.get('/api/playlist', async (req, res) => {
+  try {
+    // Check cache
+    if (playlistCache && (Date.now() - playlistCacheTime) < CACHE_DURATION) {
+      res.setHeader('Content-Type', 'audio/x-mpegurl');
+      return res.send(playlistCache);
+    }
+
+    let content = '';
+
+    // Priority 1: Base64 encoded playlist
+    if (M3U_BASE64) {
+      content = Buffer.from(M3U_BASE64, 'base64').toString('utf-8');
+    }
+    // Priority 2: External URL
+    else if (M3U_URL) {
+      content = await fetchUrl(M3U_URL);
+    }
+    // Priority 3: Local file (development only)
+    else {
+      const localPath = path.join(__dirname, 'public', 'canais.m3u');
+      if (fs.existsSync(localPath)) {
+        content = fs.readFileSync(localPath, 'utf-8');
+      } else {
+        return res.status(404).json({ error: 'Playlist not configured. Set M3U_URL or M3U_BASE64 env var.' });
+      }
+    }
+
+    // Cache the result
+    playlistCache = content;
+    playlistCacheTime = Date.now();
+
+    res.setHeader('Content-Type', 'audio/x-mpegurl');
+    res.send(content);
+  } catch (err) {
+    console.error('[Playlist] Error:', err.message);
+    res.status(500).json({ error: 'Failed to load playlist', details: err.message });
+  }
+});
+
+// Helper: Fetch URL content
+function fetchUrl(url) {
+  return new Promise((resolve, reject) => {
+    const client = url.startsWith('https') ? https : http;
+    client.get(url, (response) => {
+      if (response.statusCode !== 200) {
+        return reject(new Error(`HTTP ${response.statusCode}`));
+      }
+      let data = '';
+      response.on('data', chunk => data += chunk);
+      response.on('end', () => resolve(data));
+    }).on('error', reject);
+  });
+}
+
+// Manual Stream Proxy - full control over headers
+app.use('/stream-proxy', (req, res) => {
+  const targetPath = req.url;
+  
+  console.log(`[Proxy] ${req.method} -> ${IPTV_HOST}:${IPTV_PORT}${targetPath}`);
+  
+  const proxyOptions = {
+    hostname: IPTV_HOST,
+    port: IPTV_PORT,
+    path: targetPath,
+    method: req.method,
+    headers: {
+      'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18',
+      'Accept': '*/*',
+      'Connection': 'keep-alive',
+      'Host': `${IPTV_HOST}:${IPTV_PORT}`
+    }
+  };
+
+  // Forward Range header for seeking in videos
+  if (req.headers.range) {
+    proxyOptions.headers['Range'] = req.headers.range;
+  }
+
+  const proxyReq = http.request(proxyOptions, (proxyRes) => {
+    // Set CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Content-Type');
+    
+    // Forward original headers (except problematic ones)
+    Object.keys(proxyRes.headers).forEach(key => {
+      if (!['transfer-encoding'].includes(key.toLowerCase())) {
+        res.setHeader(key, proxyRes.headers[key]);
+      }
+    });
+    
+    res.status(proxyRes.statusCode);
+    proxyRes.pipe(res);
+  });
+
+  proxyReq.on('error', (err) => {
+    console.error('[Proxy] Error:', err.message);
+    if (!res.headersSent) {
+      res.status(502).json({ error: 'Stream unavailable', details: err.message });
+    }
+  });
+
+  req.on('close', () => proxyReq.destroy());
+  proxyReq.end();
+});
+
+// Serve static files from React build
+app.use(express.static(path.join(__dirname, 'dist')));
+
+// SPA fallback - serve index.html for all other routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
+
+app.listen(PORT, () => {
+  console.log(`🎬 CineFlow server running on port ${PORT}`);
+  console.log(`   Playlist API: /api/playlist`);
+  console.log(`   Stream proxy: /stream-proxy/* -> ${IPTV_HOST}:${IPTV_PORT}`);
+  console.log(`   M3U Source: ${M3U_BASE64 ? 'Base64 env' : M3U_URL ? 'URL env' : 'Local file (dev)'}`);
+});
+
