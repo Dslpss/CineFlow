@@ -46,6 +46,17 @@ app.get('/api/playlist', async (req, res) => {
     }
 
     let content = '';
+    
+    // Debug: Log directory contents
+    console.log('[Debug] __dirname:', __dirname);
+    console.log('[Debug] Files in root:', fs.readdirSync(__dirname));
+    
+    const dataDir = path.join(__dirname, 'data');
+    if (fs.existsSync(dataDir)) {
+      console.log('[Debug] Files in data/:', fs.readdirSync(dataDir));
+    } else {
+      console.log('[Debug] data/ folder does not exist');
+    }
 
     // Priority 1: Base64 encoded playlist
     if (M3U_BASE64) {
@@ -62,6 +73,9 @@ app.get('/api/playlist', async (req, res) => {
       const dataPath = path.join(__dirname, 'data', 'playlist.m3u');
       const publicPath = path.join(__dirname, 'public', 'canais.m3u');
       
+      console.log('[Debug] Checking dataPath:', dataPath, 'exists:', fs.existsSync(dataPath));
+      console.log('[Debug] Checking publicPath:', publicPath, 'exists:', fs.existsSync(publicPath));
+      
       if (fs.existsSync(dataPath)) {
         console.log('[Playlist] Loading from data/playlist.m3u');
         content = fs.readFileSync(dataPath, 'utf-8');
@@ -70,10 +84,16 @@ app.get('/api/playlist', async (req, res) => {
         content = fs.readFileSync(publicPath, 'utf-8');
       } else {
         console.error('[Playlist] No playlist file found!');
-        return res.status(404).json({ error: 'Playlist not configured. Set M3U_URL, M3U_BASE64, or add data/playlist.m3u' });
+        return res.status(404).json({ 
+          error: 'Playlist not configured', 
+          dirname: __dirname,
+          files: fs.readdirSync(__dirname)
+        });
       }
     }
 
+    console.log('[Playlist] Loaded', content.length, 'characters');
+    
     // Cache the result
     playlistCache = content;
     playlistCacheTime = Date.now();
@@ -81,8 +101,8 @@ app.get('/api/playlist', async (req, res) => {
     res.setHeader('Content-Type', 'audio/x-mpegurl');
     res.send(content);
   } catch (err) {
-    console.error('[Playlist] Error:', err.message);
-    res.status(500).json({ error: 'Failed to load playlist', details: err.message });
+    console.error('[Playlist] Error:', err);
+    res.status(500).json({ error: 'Failed to load playlist', details: err.message, stack: err.stack });
   }
 });
 
