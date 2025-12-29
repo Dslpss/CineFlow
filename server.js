@@ -36,6 +36,35 @@ app.use((req, res, next) => {
   next();
 });
 
+// Debug endpoint - shows server info
+app.get('/api/debug', (req, res) => {
+  const dataPath = path.join(__dirname, 'data', 'playlist.m3u');
+  const publicPath = path.join(__dirname, 'public', 'canais.m3u');
+  
+  let rootFiles = [];
+  let dataFiles = [];
+  
+  try { rootFiles = fs.readdirSync(__dirname); } catch(e) { rootFiles = ['Error: ' + e.message]; }
+  try { dataFiles = fs.readdirSync(path.join(__dirname, 'data')); } catch(e) { dataFiles = ['Error: ' + e.message]; }
+  
+  res.json({
+    dirname: __dirname,
+    cwd: process.cwd(),
+    env: {
+      IPTV_HOST: IPTV_HOST,
+      IPTV_PORT: IPTV_PORT,
+      M3U_URL: M3U_URL ? 'SET' : 'NOT SET',
+      M3U_BASE64: M3U_BASE64 ? 'SET (' + M3U_BASE64.length + ' chars)' : 'NOT SET'
+    },
+    files: {
+      root: rootFiles,
+      data: dataFiles,
+      dataPathExists: fs.existsSync(dataPath),
+      publicPathExists: fs.existsSync(publicPath)
+    }
+  });
+});
+
 // API: Serve playlist from environment variable
 app.get('/api/playlist', async (req, res) => {
   try {
