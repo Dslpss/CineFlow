@@ -162,10 +162,13 @@ app.use('/stream-proxy', (req, res) => {
     path: targetPath,
     method: req.method,
     headers: {
-      'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18',
+      'User-Agent': 'Lavf/60.3.100',  // FFmpeg/mpv style user agent
       'Accept': '*/*',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept-Encoding': 'identity',
       'Connection': 'keep-alive',
-      'Host': `${IPTV_HOST}:${IPTV_PORT}`
+      'Host': `${IPTV_HOST}:${IPTV_PORT}`,
+      'Icy-MetaData': '1'
     }
   };
 
