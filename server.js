@@ -162,7 +162,7 @@ app.use('/stream-proxy', (req, res) => {
     path: targetPath,
     method: req.method,
     headers: {
-      'User-Agent': 'Lavf/60.3.100',  // FFmpeg/mpv style user agent
+      'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18', // Emulate VLC to avoid blocking
       'Accept': '*/*',
       'Accept-Language': 'en-US,en;q=0.9',
       'Accept-Encoding': 'identity',
