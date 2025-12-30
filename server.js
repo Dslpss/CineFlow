@@ -162,8 +162,7 @@ app.use('/stream-proxy', (req, res) => {
     path: targetPath,
     method: req.method,
     headers: {
-      'User-Agent': 'IPTVSmartersPlayer', // Common IPTV player UA
-      'Accept': '*/*',
+      'User-Agent': 'okhttp/4.9.1',
       'Connection': 'keep-alive',
       'Host': `${IPTV_HOST}:${IPTV_PORT}`
     }

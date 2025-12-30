@@ -57,6 +57,14 @@ export function Player({ channel, onClose }: PlayerProps) {
       
       player.on(mpegts.Events.ERROR, (errorType, errorDetail, errorInfo) => {
         console.error("Mpegts error:", errorType, errorDetail, errorInfo);
+        
+        // Diagnostic: If network error (403/404), fetch the body to see why
+        if (errorType === mpegts.ErrorTypes.NETWORK_ERROR) {
+          fetch(absoluteProxyUrl)
+            .then(res => res.text())
+            .then(text => console.error("Stream Proxy Response Body:", text))
+            .catch(err => console.error("Diagnostic fetch failed:", err));
+        }
       });
 
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
