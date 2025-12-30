@@ -162,9 +162,12 @@ app.use('/stream-proxy', (req, res) => {
     path: targetPath,
     method: req.method,
     headers: {
-      'User-Agent': 'okhttp/4.9.1',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+      'Accept': '*/*',
       'Connection': 'keep-alive',
-      'Host': `${IPTV_HOST}:${IPTV_PORT}`
+      'Host': `${IPTV_HOST}:${IPTV_PORT}`,
+      'Referer': `http://${IPTV_HOST}:${IPTV_PORT}/`,
+      'Origin': `http://${IPTV_HOST}:${IPTV_PORT}`
     }
   };
 
