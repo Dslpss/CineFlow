@@ -162,13 +162,11 @@ app.use('/stream-proxy', (req, res) => {
     path: targetPath,
     method: req.method,
     headers: {
-      'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18', // Emulate VLC to avoid blocking
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
       'Accept': '*/*',
       'Accept-Language': 'en-US,en;q=0.9',
-      'Accept-Encoding': 'identity',
       'Connection': 'keep-alive',
-      'Host': `${IPTV_HOST}:${IPTV_PORT}`,
-      'Icy-MetaData': '1'
+      'Host': `${IPTV_HOST}:${IPTV_PORT}`
     }
   };
 
@@ -185,11 +183,21 @@ app.use('/stream-proxy', (req, res) => {
     
     // Forward original headers (except problematic ones)
     Object.keys(proxyRes.headers).forEach(key => {
-      if (!['transfer-encoding'].includes(key.toLowerCase())) {
+      if (!['transfer-encoding', 'connection'].includes(key.toLowerCase())) {
         res.setHeader(key, proxyRes.headers[key]);
       }
     });
     
+    // Log error responses
+    if (proxyRes.statusCode >= 400) {
+      console.error(`[Proxy] Remote server error: ${proxyRes.statusCode}`);
+      let errorBody = '';
+      proxyRes.on('data', chunk => errorBody += chunk);
+      proxyRes.on('end', () => {
+        console.error(`[Proxy] Error body: ${errorBody.substring(0, 500)}`); // Log first 500 chars
+      });
+    }
+
     res.status(proxyRes.statusCode);
     proxyRes.pipe(res);
   });
